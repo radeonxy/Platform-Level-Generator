@@ -11,7 +11,8 @@ WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
 TILE_SIZE = 32 #la grille de tuiles 32x32 pix
 
-LEVEL_TILES_W = WINDOW_WIDTH // TILE_SIZE
+#distribute tiles wide and high
+LEVEL_TILES_W = WINDOW_WIDTH // TILE_SIZE #integer division
 LEVEL_TILES_H = WINDOW_HEIGHT // TILE_SIZE
 
 FPS = 60
@@ -32,6 +33,7 @@ class LevelConfig:
     max_ground_y: int = LEVEL_TILES_H - 2  # max ground height
     max_step: int = 1  # max height diff between columns
     max_hole: int = 3  # max width of holes
+    #min_hole: int = 3
     hole_prob: float = 0.12 #12% chance pour avoir un trou
     coin_prob: float = 0.25 #25% pour une pièce
     spike_prob: float = 0.08 #8% pour un spike
@@ -56,14 +58,22 @@ class LevelGenerator:
         ground_y = c.max_ground_y
 
         hole_remaining = 0
+        ground_after_hole = 0  # track ground columns required before next hole
 
         for x in range(c.width):
             # Avoid holes at very start and very end
             can_have_hole = 2 <= x <= c.width - 4
 
             # Decide whether to start a new hole
-            if can_have_hole and hole_remaining == 0 and self.random.random() < c.hole_prob:
-                hole_remaining = self.random.randint(1, c.max_hole)
+            if can_have_hole and hole_remaining == 0:
+                if ground_after_hole > 0:
+                    ground_after_hole -= 1
+                elif self.random.random() < c.hole_prob:
+                    hole_remaining = self.random.randint(2, c.max_hole)
+                    # ensure hole is not too big to jump
+                    max_jump_tiles = 3
+                    hole_remaining = min(hole_remaining, max_jump_tiles)
+                    ground_after_hole = 1  # require 1 ground column before next hole
 
             # If we're in a hole, skip ground for this column
             if hole_remaining > 0:
@@ -91,8 +101,8 @@ class LevelGenerator:
             # Add spikes on ground (just above base ground)
             spike_y = ground_y - 0
             if spike_y >= 0 and self.random.random() < c.spike_prob:
-                #if grid[spike_y][x] == EMPTY:
-                    grid[spike_y][x] = SPIKE
+                # if grid[spike_y][x] == EMPTY:
+                grid[spike_y][x] = SPIKE
 
         # Ensure first and last columns are safe, with solid ground
         for x in (0, 1, c.width - 1, c.width - 2):
@@ -226,6 +236,16 @@ class Player(pygame.sprite.Sprite):
 
         self._move_axis(self.vel_x, self.vel_y, solids)
 
+#difficulty scaler
+def make_config_for_level(level: int) -> LevelConfig:
+    return LevelConfig(
+        hole_prob=min(0.10 + level * 0.01, 0.35),
+        max_hole=min(2 + level // 3, 6),
+        max_step=min(1 + level // 5, 3),
+        spike_prob=min(0.05 + level * 0.01, 0.25),
+        coin_prob=max(0.25 - level * 0.01, 0.10),
+    )
+
 
 class Game:
     def __init__(self):
@@ -252,10 +272,21 @@ class Game:
         spawn_y = ground_y_pixels
         return Player((spawn_x, spawn_y))
 
-    def reset_level(self, new_random_seed: bool = False):
+    '''def reset_level(self, new_random_seed: bool = False):
         if new_random_seed:
             seed = random.randint(0, 1_000_000)
             self.level_generator = LevelGenerator(self.level_config, seed=seed)
+        self.level = Level(self.level_generator)
+        self.player = self._create_player()'''
+
+    def reset_level(self, new_random_seed: bool = False):
+        self.level_config = make_config_for_level(self.level_index)
+
+        seed = None
+        if new_random_seed:
+            seed = random.randint(0, 1_000_000)
+
+        self.level_generator = LevelGenerator(self.level_config, seed=seed)
         self.level = Level(self.level_generator)
         self.player = self._create_player()
 
@@ -320,7 +351,7 @@ class Game:
             self.update(dt)
             self.level.draw(self.screen)
 
-            # 👉 DESSINER LE JOUEUR ICI
+            # AJOUTER LE JOUEUR 
             self.screen.blit(self.player.image, self.player.rect)
 
             self.draw_ui()
