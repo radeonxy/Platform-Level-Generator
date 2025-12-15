@@ -56,6 +56,10 @@ L'algorithme parcourt le niveau de gauche à droite et construit chaque colonne 
 - -1 point : tomber dans le vide (erreur de navigation)
 - Nouveau niveau : atteindre le bord droit de l'écran
 
+# Difficulté Progressive
+La fonction make_config_for_level ajuste automatiquement les paramètres d’un niveau en fonction de l’index du niveau actuel, permettant à la difficulté du jeu d’augmenter au fur et à mesure que le joueur progresse.
+Cela garantit que chaque nouveau niveau devient progressivement plus difficile tout en restant jouable et équitable pour le joueur.
+
 # Exemples de Niveaux Générés
   ## Niveau 1 - Facile
   - 2 trous de 2 tuiles
